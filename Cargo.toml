@@ -12,12 +12,12 @@ keywords = ["aht10", "embedded-hal", "humidity", "temperature"]
 categories = ["embedded", "hardware-support", "no-std"]
 
 [dependencies]
-embedded-hal = "0.2.5"
+embedded-hal = "1.0.0"
 
 [dev-dependencies]
 rp-pico = { version = "0.8.0", features = ["rp2040-e5"] }
 embedded-alloc = "0.5.0"
-cortex-m = { version = "0.7.6"}
+cortex-m = { version = "0.7.6" }
 cortex-m-rt = "0.7.3"
 usb-device = "0.2.9"
 usbd-serial = "0.1.1"

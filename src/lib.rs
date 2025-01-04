@@ -3,11 +3,14 @@
 use data::Aht10Data;
 /// Datasheet used for this driver : https://en.maritex.com.pl/product/attachment/147096/c5093eda6658ef654b651f3d5705c2ef
 /// It's very basic, and lot of information is missing.
-use embedded_hal as hal;
-use hal::blocking::{
-    delay::DelayMs,
-    i2c::{Read, Write},
+use embedded_hal::{
+    delay::DelayNs,
+    i2c::{Error, I2c},
 };
+// use hal::blocking::{
+//     delay::DelayMs,
+//     i2c::{Read, Write},
+// };
 
 pub mod data;
 
@@ -28,7 +31,7 @@ enum Aht10Commands {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum AhtError<E> {
+pub enum AhtError<E: Error> {
     ReadTimeout,
     BusError(E),
 }
@@ -44,16 +47,16 @@ pub struct AHT10<I2C> {
     i2c_dev: I2C,
 }
 
-impl<I2C, E> AHT10<I2C>
+impl<I2C> AHT10<I2C>
 where
-    I2C: Write<Error = E> + Read<Error = E>,
+    I2C: I2c,
 {
     pub fn new(i2c: I2C) -> Self {
         Self { i2c_dev: i2c }
     }
 
     /// Initialize the sensor.
-    pub fn initialize(&mut self) -> Result<(), AhtError<E>> {
+    pub fn initialize(&mut self) -> Result<(), AhtError<I2C::Error>> {
         self.write_command(
             Aht10Commands::Initialization,
             AHT10_INIT_MODE_NORMAL | AHT10_INIT_CALIBRATION_ON,
@@ -62,7 +65,7 @@ where
     }
 
     /// Read the internal status register.
-    pub fn read_status(&mut self) -> Result<Aht10Status, AhtError<E>> {
+    pub fn read_status(&mut self) -> Result<Aht10Status, AhtError<I2C::Error>> {
         let mut buffer: [u8; 6] = [0; 6];
         self.i2c_dev
             .read(AHT10_ADDRESS, &mut buffer)
@@ -80,10 +83,10 @@ where
     }
 
     /// Triggers and waits for measurements. This is a blocking function, which takes at least 70 ms (3 retries of 75ms each).
-    pub fn read_data<Delay: DelayMs<u16>>(
+    pub fn read_data<Delay: DelayNs>(
         &mut self,
         delay: &mut Delay,
-    ) -> Result<Aht10Data, AhtError<E>> {
+    ) -> Result<Aht10Data, AhtError<I2C::Error>> {
         self.write_command(Aht10Commands::TriggerMeasure, 0x33, 0x00)?; // 0x33 is a magic value given by the "datasheet"
 
         let mut status = self.read_status()?;
@@ -105,10 +108,10 @@ where
     }
 
     /// Reset the sensor. This is a blocking function, the reset takes 20ms. WARNING: You must re-initialize the sensor after the reset !
-    pub fn soft_reset<Delay: DelayMs<u16>>(
+    pub fn soft_reset<Delay: DelayNs>(
         &mut self,
         delay: &mut Delay,
-    ) -> Result<(), AhtError<E>> {
+    ) -> Result<(), AhtError<I2C::Error>> {
         self.write_command(Aht10Commands::SoftReset, 0, 0)?;
         delay.delay_ms(20);
         Ok(())
@@ -119,13 +122,13 @@ where
         cmd: Aht10Commands,
         data0: u8,
         data1: u8,
-    ) -> Result<(), AhtError<E>> {
+    ) -> Result<(), AhtError<I2C::Error>> {
         self.i2c_dev
             .write(AHT10_ADDRESS, &[cmd as u8, data0, data1])
             .map_err(|e| AhtError::BusError(e))
     }
 
-    fn read_raw_data(&mut self) -> Result<[u8; 5], AhtError<E>> {
+    fn read_raw_data(&mut self) -> Result<[u8; 5], AhtError<I2C::Error>> {
         let mut buffer: [u8; 6] = [0; 6];
         self.i2c_dev
             .read(AHT10_ADDRESS, &mut buffer)
